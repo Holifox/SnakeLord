@@ -1,7 +1,8 @@
 import pygame as pg
 import pygame_menu as pg_menu
 import ctypes
-from math import hypot
+from math import hypot, sqrt
+import random
 
 BACK_COLOR = (10, 50, 50)
 BACK_COLOR2 = (10, 30, 30)
@@ -10,8 +11,8 @@ FONT_COLOR = (10, 80, 80)
 
 pg.init()
 ctypes.windll.user32.SetProcessDPIAware()
-face = pg.display.set_mode((0, 0), pg.FULLSCREEN)
-W, H = face.get_size()
+surf = pg.display.set_mode((0, 0), pg.FULLSCREEN)
+W, H = surf.get_size()
 pg.display.set_caption("Snake Lord")
 font = pg.font.SysFont('Verdana', 40)
 clock = pg.time.Clock()
@@ -19,95 +20,127 @@ clock = pg.time.Clock()
 
 # Load the background image
 back = pg.image.load(r'back.png')
-face2 = pg.Surface((W*3, H*3))
-face2.blit(back, (0, 0))
-face2_pos = (-W, -H)
+surf2 = pg.Surface((W*3, H*3)) #sub? scroll?
+surf2.blit(back, (0, 0))
+surf2_pos = (-W, -H)
 run = True
 FPS = 30
+
+
+# ------------------------------ Classes ------------------------------ #
 
 
 class SnakeItem(pg.sprite.Sprite):
     def __init__(self, x, y, r) -> None:
         super().__init__()
-        surf = pg.Surface((2*r, 2*r), pg.SRCALPHA)
-        pg.draw.circle(surf, (0, 100, 80), (r, r), r)
-        self.image = surf
-        self.rect = (x, y, r*2, r*2)
+
+        x, y = round(x), round(y)
+        self.rect = pg.Rect(x, y, r*2, r*2)
+        img_surf = pg.Surface((2*r, 2*r), pg.SRCALPHA)
+
+        pg.draw.circle(img_surf, (0, 100, 80), (r, r), r)
+        self.image = img_surf
         self.r = r
 
-    def clear(self) -> None:
-        global face2, back
-        x, y, w, h = tuple(map(int, self.rect))
-        face2.blit(back, (x, y), self.rect)
-        
         
 class Snake():
-    def __init__(self, length: int, dencity: int, thickness: int) -> None:
+    def __init__(self, length: int) -> None:
         # pg.sprite.Group.__init__(self)
-        num_items = length // dencity
+        thickness = 2*sqrt(length)
+        dencity = thickness // 2
         items = []
-        for i in range(num_items):
+        for i in range(length):
             item = SnakeItem(W*1.5 - i*dencity, H*1.5, thickness)
             items.append(item)
         self.items = items
         self.dencity = dencity
         self.thickness = thickness
-        track_item = items[0]
-        self.track_item_pos = track_item.rect[:2]
-
 
     def move(self) -> None:
-        global face2, face2_pos
+        '''The function makes the snake moving after mouse cursor'''
+        global surf2, surf2_pos
+
+        # Take coords of snake's first item
         head_item = self.items[0]
-        mouse_x, mouse_y = pg.mouse.get_pos()
-        mouse_x -= face2_pos[0]
-        mouse_y -= face2_pos[1]
         head_item_x, head_item_y = head_item.rect[:2]
 
+        # determine mouse cursor position 
+        mouse_x, mouse_y = pg.mouse.get_pos()
+        mouse_x -= surf2_pos[0]
+        mouse_y -= surf2_pos[1]
+
+        # Count coords for snake's new item
         dist_x, dist_y = mouse_x - head_item_x, mouse_y - head_item_y
         dist = hypot(dist_x, dist_y)
         cos = dist_x / dist
         sin = dist_y / dist
-        
-        new_item_x = head_item_x + self.dencity * cos
-        new_item_y = head_item_y + self.dencity * sin
+        dx, dy = round(self.dencity * cos), round(self.dencity * sin)
+        new_item_x = head_item_x + dx
+        new_item_y = head_item_y + dy
+
+        # Set a new item and discard the last
         new_item = SnakeItem(new_item_x, new_item_y, head_item.r)
         self.items.insert(0, new_item)
         tail_item = self.items.pop()
-        tail_item.clear()
+        clear(tail_item)
 
-        new_track_item = self.items[0]
-        x2, y2 = new_track_item.rect[:2]
-        x1, y1 = self.track_item_pos
-        self.track_item_shift = (x2 - x1, y2 - y1)
-        self.track_item_pos = (x2, y2)
+        self.head_item_shift = (dx, dy)
 
-    def draw(self, surface: pg.Surface):
+    def draw(self):
+        global surf2
         for item in self.items:
             x, y = item.rect[:2]
-            surface.blit(item.image, (x, y))
+            surf2.blit(item.image, (x, y))
+
+    
+
+class Bonus(pg.sprite.Sprite):
+    def __init__(self, group) -> None:
+        super().__init__(group)
+
+        colors = ((200, 100, 100), (100, 200, 100), (100, 100, 200))
+        color = random.choice(colors)
+        w, h = surf2.get_rect()[2:]
+        r = 10
+
+        x, y = random.randrange(30, w - 30), random.randrange(30, h - 30)
+        self.rect = pg.Rect(x, y, 2*r, 2*r)
+        img_surf = pg.Surface((2*r, 2*r), pg.SRCALPHA)
+        pg.draw.circle(img_surf, color, (r, r), r)
+
+        self.image = img_surf
 
 
+# ------------------------------ Functions ------------------------------ #
 
-main_snake = Snake(
-    length = 300, 
-    dencity = 7, 
-    thickness = 15
-    )
+
+def clear(obj) -> None:
+    global surf2, back
+    x, y = obj.rect[:2]
+    surf2.blit(back, (x, y), obj.rect)
+
 
 def drag_screen():
-    global face2, face, main_snake, face2_pos
+    global main_snake, surf2_pos
 
-    dx, dy = main_snake.track_item_shift
-    # face.scroll(int(-dx), int(-dy))
-    x, y = face2_pos
-    face2_pos = (x - dx, y - dy)
+    dx, dy = main_snake.head_item_shift
+    x, y = surf2_pos
+    surf2_pos = (x - dx, y - dy)
+
+
+
 
 def game():
-    global main_menu, run, face, main_snake
+    global main_menu, run, surf, main_snake
+
+    num_bonuses = 1000
+    bonuses = pg.sprite.Group()
+    for i in range(num_bonuses):
+        bonus = Bonus(bonuses)
+    bonuses.draw(surf2)
+    main_snake = Snake(100)
 
     main_menu.disable()
-    face.blit(face2, face2_pos)
     while run:
         events = pg.event.get()
         for event in events:
@@ -115,12 +148,13 @@ def game():
                 exit()
 
         main_snake.move()
-        main_snake.draw(face2)   
+        main_snake.draw()
         drag_screen()
-        face.fill((0, 0, 0))
-        face.blit(face2, face2_pos)
+        surf.fill((0, 0, 0))
+        surf.blit(surf2, surf2_pos)
         pg.display.update()
         clock.tick(FPS)
+        print(pg.sprite.spritecollideany(main_snake.items[0], bonuses))
 
     
 
@@ -167,4 +201,4 @@ for menu in [main_menu]:
 
         set_size(widget)
 
-main_menu.mainloop(face, bgfun = lambda: face.blit(face2, (0, 0)))
+main_menu.mainloop(surf, bgfun = lambda: surf.blit(surf2, (0, 0)))
