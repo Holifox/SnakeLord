@@ -8,6 +8,7 @@ BACK_COLOR = (10, 50, 50)
 BACK_COLOR2 = (10, 30, 30)
 BORDER_COLOR = (10, 70, 70)
 FONT_COLOR = (10, 80, 80)
+BONUS_COLORS = ((200, 100, 100), (100, 200, 100), (100, 100, 200))
 
 pg.init()
 ctypes.windll.user32.SetProcessDPIAware()
@@ -56,7 +57,7 @@ class Snake():
         self.dencity = dencity
         self.thickness = thickness
 
-    def move(self) -> None:
+    def move(self, bonuses) -> None:
         '''The function makes the snake moving after mouse cursor'''
         global surf2, surf2_pos
 
@@ -81,8 +82,15 @@ class Snake():
         # Set a new item and discard the last
         new_item = SnakeItem(new_item_x, new_item_y, head_item.r)
         self.items.insert(0, new_item)
-        tail_item = self.items.pop()
-        clear(tail_item)
+
+        test_collide = pg.sprite.spritecollideany(new_item, bonuses)
+        if test_collide == None: # if no bonuses were eaten
+            tail_item = self.items.pop()
+            clear(tail_item)
+        else:
+            bonus = test_collide
+            bonus.kill()
+            clear(bonus)
 
         self.head_item_shift = (dx, dy)
 
@@ -91,24 +99,6 @@ class Snake():
         for item in self.items:
             x, y = item.rect[:2]
             surf2.blit(item.image, (x, y))
-
-    
-
-class Bonus(pg.sprite.Sprite):
-    def __init__(self, group) -> None:
-        super().__init__(group)
-
-        colors = ((200, 100, 100), (100, 200, 100), (100, 100, 200))
-        color = random.choice(colors)
-        w, h = surf2.get_rect()[2:]
-        r = 10
-
-        x, y = random.randrange(30, w - 30), random.randrange(30, h - 30)
-        self.rect = pg.Rect(x, y, 2*r, 2*r)
-        img_surf = pg.Surface((2*r, 2*r), pg.SRCALPHA)
-        pg.draw.circle(img_surf, color, (r, r), r)
-
-        self.image = img_surf
 
 
 # ------------------------------ Functions ------------------------------ #
@@ -128,33 +118,49 @@ def drag_screen():
     surf2_pos = (x - dx, y - dy)
 
 
+def set_bonuses(num: int) -> pg.sprite.Group:
+    global surf2
+    bonuses = pg.sprite.Group()
+    r = 10
+    w, h = surf2.get_size()
+
+    for i in range(num):
+        color = random.choice(BONUS_COLORS)
+        x = random.randrange(2*r, w - 4*r)
+        y = random.randrange(2*r, h - 4*r)
+
+        img_surf = pg.Surface((2*r, 2*r), pg.SRCALPHA)
+        pg.draw.circle(img_surf, color, (r, r), r)
+
+        bonus = pg.sprite.Sprite(bonuses)
+        bonus.image = img_surf
+        bonus.rect = pg.Rect(x, y, 2*r, 2*r)
+
+    return bonuses
 
 
 def game():
-    global main_menu, run, surf, main_snake
-
-    num_bonuses = 1000
-    bonuses = pg.sprite.Group()
-    for i in range(num_bonuses):
-        bonus = Bonus(bonuses)
-    bonuses.draw(surf2)
-    main_snake = Snake(100)
+    global main_menu, run, main_snake
 
     main_menu.disable()
+    bonuses = set_bonuses(1000)
+    bonuses.draw(surf2)
+    main_snake = Snake(50)
+
     while run:
         events = pg.event.get()
         for event in events:
             if event.type == pg.QUIT:
                 exit()
 
-        main_snake.move()
+        main_snake.move(bonuses)
+        print(len(main_snake.items))
         main_snake.draw()
         drag_screen()
         surf.fill((0, 0, 0))
         surf.blit(surf2, surf2_pos)
         pg.display.update()
         clock.tick(FPS)
-        print(pg.sprite.spritecollideany(main_snake.items[0], bonuses))
 
     
 
