@@ -15,15 +15,15 @@ ctypes.windll.user32.SetProcessDPIAware()
 surf = pg.display.set_mode((0, 0), pg.FULLSCREEN)
 W, H = surf.get_size()
 pg.display.set_caption("Snake Lord")
-font = pg.font.SysFont('Verdana', 40)
+font = pg.font.SysFont('Verdana', 60)
 clock = pg.time.Clock()
 
 
 # Load the background image
 back = pg.image.load(r'back.png')
-surf2 = pg.Surface((W*3, H*3)) #sub? scroll?
+surf2 = pg.Surface((W*3, H*3)) 
 surf2.blit(back, (0, 0))
-surf2_pos = (-W, -H)
+surf2_pos = (W//2, H//2)
 run = True
 FPS = 30
 
@@ -36,12 +36,11 @@ class SnakeItem(pg.sprite.Sprite):
         super().__init__()
 
         x, y = round(x), round(y)
-        self.rect = pg.Rect(x, y, r*2, r*2)
         img_surf = pg.Surface((2*r, 2*r), pg.SRCALPHA)
 
         pg.draw.circle(img_surf, (0, 100, 80), (r, r), r)
         self.image = img_surf
-        self.r = r
+        self.rect = pg.Rect(x, y, r*2, r*2)
 
         
 class Snake():
@@ -57,8 +56,7 @@ class Snake():
         self.dencity = dencity
         self.thickness = thickness
 
-    def move(self, bonuses) -> None:
-        '''The function makes the snake moving after mouse cursor'''
+    def add_new_item(self):
         global surf2, surf2_pos
 
         # Take coords of snake's first item
@@ -67,8 +65,9 @@ class Snake():
 
         # determine mouse cursor position 
         mouse_x, mouse_y = pg.mouse.get_pos()
-        mouse_x -= surf2_pos[0]
-        mouse_y -= surf2_pos[1]
+        surf2_w, surf2_h = surf2.get_size()
+        mouse_x += -surf2_pos[0] + 0.5 * surf2_w
+        mouse_y += -surf2_pos[1] + 0.5 * surf2_h
 
         # Count coords for snake's new item
         dist_x, dist_y = mouse_x - head_item_x, mouse_y - head_item_y
@@ -80,19 +79,26 @@ class Snake():
         new_item_y = head_item_y + dy
 
         # Set a new item and discard the last
-        new_item = SnakeItem(new_item_x, new_item_y, head_item.r)
+        new_item = SnakeItem(new_item_x, new_item_y, self.thickness)
         self.items.insert(0, new_item)
+    
+        return (dx, dy)
 
-        test_collide = pg.sprite.spritecollideany(new_item, bonuses)
+    def check_bonus(self, bonuses):
+        head_item = self.items[0]
+        test_collide = pg.sprite.spritecollideany(head_item, bonuses)
         if test_collide == None: # if no bonuses were eaten
             tail_item = self.items.pop()
             clear(tail_item)
         else:
+            length = len(self.items)
+            self.thickness = 2*sqrt(length)
+            # self.dencity = self.thickness // 2
+
             bonus = test_collide
             bonus.kill()
             clear(bonus)
 
-        self.head_item_shift = (dx, dy)
 
     def draw(self):
         global surf2
@@ -109,13 +115,6 @@ def clear(obj) -> None:
     x, y = obj.rect[:2]
     surf2.blit(back, (x, y), obj.rect)
 
-
-def drag_screen():
-    global main_snake, surf2_pos
-
-    dx, dy = main_snake.head_item_shift
-    x, y = surf2_pos
-    surf2_pos = (x - dx, y - dy)
 
 
 def set_bonuses(num: int) -> pg.sprite.Group:
@@ -140,7 +139,7 @@ def set_bonuses(num: int) -> pg.sprite.Group:
 
 
 def game():
-    global main_menu, run, main_snake
+    global main_menu, run, main_snake, surf2_pos
 
     main_menu.disable()
     bonuses = set_bonuses(1000)
@@ -153,12 +152,20 @@ def game():
             if event.type == pg.QUIT:
                 exit()
 
-        main_snake.move(bonuses)
-        print(len(main_snake.items))
+        dx, dy = main_snake.add_new_item()
+        main_snake.check_bonus(bonuses)
         main_snake.draw()
-        drag_screen()
+
         surf.fill((0, 0, 0))
-        surf.blit(surf2, surf2_pos)
+        x, y = surf2_pos
+        surf2_pos = (x - dx, y - dy)
+        surf2_rect = surf2.get_rect(center = surf2_pos)
+        surf.blit(surf2, surf2_rect)
+
+        length = len(main_snake.items)
+        text_surf = font.render(f'Score: {length}', 1, (10, 100, 100))
+        surf.blit(text_surf, (50, 30))
+        
         pg.display.update()
         clock.tick(FPS)
 
