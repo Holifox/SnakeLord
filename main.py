@@ -1,7 +1,7 @@
 import pygame as pg
 import pygame_menu as pg_menu
 import ctypes
-from math import hypot, sqrt
+from math import hypot, sqrt, pow
 import random
 
 BACK_COLOR = (10, 50, 50)
@@ -53,6 +53,7 @@ class Snake():
             item = SnakeItem(W*1.5 - i*dencity, H*1.5, thickness)
             items.append(item)
         self.items = items
+        self.len = length
         self.dencity = dencity
         self.thickness = thickness
 
@@ -91,8 +92,8 @@ class Snake():
             tail_item = self.items.pop()
             clear(tail_item)
         else:
-            length = len(self.items)
-            self.thickness = 2*sqrt(length)
+            self.len = len(self.items)
+            self.thickness = 2*sqrt(self.len)
             # self.dencity = self.thickness // 2
 
             bonus = test_collide
@@ -138,6 +139,27 @@ def set_bonuses(num: int) -> pg.sprite.Group:
     return bonuses
 
 
+def blit_surf2(dx, dy):
+    global surf, surf2, surf2_pos, main_snake
+    x, y = surf2_pos
+    surf2_pos = (x - dx, y - dy)
+    surf2_x, surf2_y = surf2_pos
+    
+    length = main_snake.len
+    k = pow(length / 50, 0.3)
+    small_surf2_x = W//2 - round((W//2 - surf2_x) / k)
+    small_surf2_y = H//2 - round((H//2 - surf2_y) / k)
+    small_surf2_pos = (small_surf2_x, small_surf2_y)
+
+    surf2_w, surf2_h = surf2.get_size()
+    small_surf2_w = round(surf2_w / k)
+    small_surf2_h = round(surf2_h / k)
+    
+    small_surf2 = pg.transform.scale(surf2, (small_surf2_w, small_surf2_h))
+    small_surf2_rect = small_surf2.get_rect(center = small_surf2_pos)
+    surf.blit(small_surf2, small_surf2_rect)
+
+
 def game():
     global main_menu, run, main_snake, surf2_pos
 
@@ -157,13 +179,8 @@ def game():
         main_snake.draw()
 
         surf.fill((0, 0, 0))
-        x, y = surf2_pos
-        surf2_pos = (x - dx, y - dy)
-        surf2_rect = surf2.get_rect(center = surf2_pos)
-        surf.blit(surf2, surf2_rect)
-
-        length = len(main_snake.items)
-        text_surf = font.render(f'Score: {length}', 1, (10, 100, 100))
+        blit_surf2(dx, dy)
+        text_surf = font.render(f'Score: {main_snake.len}', 1, (10, 100, 100))
         surf.blit(text_surf, (50, 30))
         
         pg.display.update()
